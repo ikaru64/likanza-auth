@@ -6,6 +6,7 @@ const sql = neon(process.env.DATABASE_URL);
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
+  debug: true,
   providers: [Google],
   callbacks: {
     async signIn({ user }) {
