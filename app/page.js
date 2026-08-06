@@ -1,16 +1,51 @@
 import { redirect } from "next/navigation";
 import { auth, signIn, signOut } from "../auth";
 
+// Domaines du site statique autorisés comme destination de redirection.
+const ALLOWED_REDIRECT_HOSTS = [
+  "likanza-academy.vercel.app",
+  "ikaru64.github.io",
+  "localhost:5050",
+  "127.0.0.1:5050",
+];
+
+function isAllowedCallback(url) {
+  try {
+    return ALLOWED_REDIRECT_HOSTS.includes(new URL(url).host);
+  } catch {
+    return false;
+  }
+}
+
+function withParam(url, param) {
+  return url + (url.includes("?") ? "&" : "?") + param;
+}
+
 export default async function Home({ searchParams }) {
   const session = await auth();
   const sp = await searchParams;
-  const callbackUrl = typeof sp?.callbackUrl === "string" && sp.callbackUrl ? sp.callbackUrl : "/";
+  const rawCallback = typeof sp?.callbackUrl === "string" ? sp.callbackUrl : "";
+  const hasExternalCallback = rawCallback && isAllowedCallback(rawCallback);
+  const callbackUrl = hasExternalCallback ? rawCallback : "/";
+  const wantsSignOut = sp?.action === "signout";
 
-  // Déjà connecté et on vient d'un autre site : on repart directement, pas
-  // besoin d'afficher cette page intermédiaire.
-  if (session && callbackUrl !== "/") {
-    redirect(callbackUrl);
+  if (hasExternalCallback) {
+    if (wantsSignOut) {
+      // Déjà déconnecté : on repart directement avec le marqueur, rien à confirmer.
+      if (!session) redirect(withParam(callbackUrl, "la_signedout=1"));
+      // Sinon on affiche ci-dessous le bouton de confirmation de déconnexion.
+    } else if (session) {
+      // Connecté et on vient d'un autre site pour se connecter : on repart avec
+      // les infos utilisateur encodées dans le fragment (jamais envoyé au serveur).
+      const payload = Buffer.from(
+        JSON.stringify({ email: session.user.email, name: session.user.name, image: session.user.image })
+      ).toString("base64");
+      redirect(`${callbackUrl}#la_user=${encodeURIComponent(payload)}`);
+    }
   }
+
+  const signInRedirect = hasExternalCallback ? `/?callbackUrl=${encodeURIComponent(callbackUrl)}` : "/";
+  const signOutRedirect = hasExternalCallback ? withParam(callbackUrl, "la_signedout=1") : "/";
 
   return (
     <div
@@ -40,7 +75,7 @@ export default async function Home({ searchParams }) {
           <form
             action={async () => {
               "use server";
-              await signOut({ redirectTo: callbackUrl });
+              await signOut({ redirectTo: signOutRedirect });
             }}
           >
             <button
@@ -62,7 +97,7 @@ export default async function Home({ searchParams }) {
         <form
           action={async () => {
             "use server";
-            await signIn("google", { redirectTo: callbackUrl });
+            await signIn("google", { redirectTo: signInRedirect });
           }}
         >
           <button
