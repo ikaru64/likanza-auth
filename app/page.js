@@ -1,7 +1,16 @@
+import { redirect } from "next/navigation";
 import { auth, signIn, signOut } from "../auth";
 
-export default async function Home() {
+export default async function Home({ searchParams }) {
   const session = await auth();
+  const sp = await searchParams;
+  const callbackUrl = typeof sp?.callbackUrl === "string" && sp.callbackUrl ? sp.callbackUrl : "/";
+
+  // Déjà connecté et on vient d'un autre site : on repart directement, pas
+  // besoin d'afficher cette page intermédiaire.
+  if (session && callbackUrl !== "/") {
+    redirect(callbackUrl);
+  }
 
   return (
     <div
@@ -20,7 +29,7 @@ export default async function Home() {
     >
       <h1 style={{ fontSize: 28, fontWeight: 600 }}>Likanza Academy — Compte</h1>
       <p style={{ color: "#9B968C", fontSize: 13, maxWidth: 420 }}>
-        Page de test de la connexion. Une fois que ça fonctionne ici, on la reliera au site principal.
+        Connexion Likanza Academy.
       </p>
 
       {session ? (
@@ -31,7 +40,7 @@ export default async function Home() {
           <form
             action={async () => {
               "use server";
-              await signOut();
+              await signOut({ redirectTo: callbackUrl });
             }}
           >
             <button
@@ -53,7 +62,7 @@ export default async function Home() {
         <form
           action={async () => {
             "use server";
-            await signIn("google");
+            await signIn("google", { redirectTo: callbackUrl });
           }}
         >
           <button
