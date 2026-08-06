@@ -3,6 +3,8 @@ import { neon } from "@neondatabase/serverless";
 
 const sql = neon(process.env.DATABASE_URL);
 
+// Autorise les appels depuis le site statique (GitHub Pages), qui est sur un
+// autre nom de domaine. À restreindre à ton vrai domaine une fois connu.
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
